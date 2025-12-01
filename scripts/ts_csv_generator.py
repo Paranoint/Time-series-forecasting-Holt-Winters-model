@@ -52,6 +52,18 @@ def generate_time_series(
     df["y"] = y
     df["t"] = t
 
+    # добавляем истину
+    cfg_dict = {
+        "intercept": intercept,
+        "trend": trend,
+        "season_amp": season_amp,
+        "season_period": season_period,
+        "ar_phi": ar_phi,
+        "sigma": sigma,
+    }
+    for k, v in cfg_dict.items():
+        df[f"true_{k}"] = v
+
     return df
 
 params = {
