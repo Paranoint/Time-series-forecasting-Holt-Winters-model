@@ -50,47 +50,60 @@ def generate_time_series(
     df = pd.DataFrame({"t": t, "y": y})
     return df
 
-params = {
-    "n": 1000,
+base_params = {
     "intercept": 10.0,
     "trend": 0.69,
-    "season_amp": 20.0,
-    "season_period": 12,
-    "ar_phi": None,
+    "season_amp": 0,
+    "season_period": 24,
+    "ar_phi": 0.7,
     "sigma": 1.0,
-    "outlier_frac": 0,
     "seed": 42,
 }
 
-df = generate_time_series(
-    n=int(round(params["n"] * 1.3)),
-    intercept=params["intercept"],
-    trend=params["trend"],
-    season_amp=params["season_amp"],
-    season_period=params["season_period"],
-    ar_phi=params["ar_phi"],
-    sigma=params["sigma"],
-    outlier_frac=params["outlier_frac"],
-    seed=params["seed"],
-)
 
-print(df.head(10))
-print(f"\nShape: {df.shape}")
-print(f"Mean: {df['y'].mean():.4f}, Std: {df['y'].std():.4f}")
+# Комбинации для генерации
+n_list = [50, 100, 500, 1000, 10000]
+outliers_for_big_n = [0.1, 0.2, 0.3]
 
 project_root = Path(__file__).resolve().parent.parent
 out_dir = project_root / "data"
 out_dir.mkdir(parents=True, exist_ok=True)
 
-fname = (
-    "season_"
-    + "_".join(
-        _sanitize(params[k])
-        for k in ("n", "outlier_frac")
-    )
-    + ".csv"
-)
-out_path = out_dir / fname
+def create_and_save(n, outlier_frac):
+    """Генерация + сохранение в CSV."""
+    params = base_params.copy()
+    params["n"] = n
+    params["outlier_frac"] = outlier_frac
 
-df.to_csv(out_path, index=False)
-print(f"\nSaved: {out_path}")
+    df = generate_time_series(
+        n=int(round(n * 1.3)),
+        intercept=params["intercept"],
+        trend=params["trend"],
+        season_amp=params["season_amp"],
+        season_period=params["season_period"],
+        ar_phi=params["ar_phi"],
+        sigma=params["sigma"],
+        outlier_frac=params["outlier_frac"],
+        seed=params["seed"],
+    )
+
+    fname = (
+        "AR_"
+        + "_".join(
+            _sanitize(params[k])
+            for k in ("n", "outlier_frac")
+        )
+        + ".csv"
+    )
+    out_path = out_dir / fname
+    df.to_csv(out_path, index=False)
+    print(f"Saved: {out_path}")
+
+
+# 1) ДАННЫЕ БЕЗ ВЫБРОСОВ
+for n in n_list:
+    create_and_save(n, outlier_frac=0)
+
+# 2) ДАННЫЕ С ВЫБРОСАМИ ТОЛЬКО ДЛЯ n=10000
+for o in outliers_for_big_n:
+    create_and_save(10000, outlier_frac=o)
