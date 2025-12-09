@@ -15,12 +15,15 @@ def parse_filename(name):
     name = name.replace(".json", "")
 
     # poly or not
-    if name.startswith("ts_poly_"):
-        model = "poly"
-        name = name[len("ts_poly_"):]  # drop prefix
-    elif name.startswith("ts_"):
+    if name.startswith("linear_"):
         model = "linear"
-        name = name[len("ts_"):]  # drop prefix
+        name = name[len("linear_"):]  # drop prefix
+    elif name.startswith("season_"):
+        model = "season"
+        name = name[len("season_"):]  # drop prefix
+    elif name.startswith("AR_"):
+        model = "AR"
+        name = name[len("AR_"):]  # drop prefix
     else:
         model = "unknown"
 
@@ -31,12 +34,11 @@ def parse_filename(name):
     # expected: X, Y, Z, hw, metrics (so take first 3)
     try:
         n = int(parts[0])
-        n_features = int(parts[1])
-        outlier_frac = float(parts[2])
+        outlier_frac = float(parts[1])
     except:
-        n, n_features, outlier_frac = None, None, None
+        n, outlier_frac = None, None
 
-    return model, n, n_features, outlier_frac
+    return model, n, outlier_frac
 
 
 def collect_json_to_csv(input_dir, output_csv):
@@ -54,11 +56,10 @@ def collect_json_to_csv(input_dir, output_csv):
         row["filename"] = fp.name
 
         # extract model params from filename
-        model, n, n_features, outlier_frac = parse_filename(fp.name)
+        model, n, outlier_frac = parse_filename(fp.name)
 
         row["model"] = model
         row["file_n"] = n
-        row["file_n_features"] = n_features
         row["file_outlier_frac"] = outlier_frac
 
         # flatten param_deviation
@@ -76,6 +77,6 @@ def collect_json_to_csv(input_dir, output_csv):
     
 if __name__ == "__main__":
     collect_json_to_csv(
-        input_dir="./output/python",      # папка с json
-        output_csv="./output/results_py.csv"       # куда сохранять
+        input_dir="./output/r",      # папка с json
+        output_csv="./output/results_r.csv"       # куда сохранять
     )
