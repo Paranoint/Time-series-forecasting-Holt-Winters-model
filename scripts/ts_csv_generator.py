@@ -11,9 +11,9 @@ def generate_time_series(
     n=100,
     intercept=10.0,      # начальный уровень
     trend=0.1,           # коэффициент тренда
+    seasonal_type=None,   # "add" | "mul" | None
     season_amp=0.0,      # амплитуда сезонности
     season_period=None,  # период сезонности
-    ar_phi=None,         # коэффициент AR(1)
     sigma=1.0,           # стандартное отклонение шума
     outlier_frac=0.0,
     seed=None,
@@ -22,30 +22,45 @@ def generate_time_series(
     t = np.arange(n)
     
     # база в виде intercept + trend*t
-    y = intercept + trend * t
+    base = intercept + trend * t
     
     # сезонность
-    if season_period and season_amp != 0:
-        y = y + season_amp * np.sin(2 * np.pi * t / season_period)
-    
-    # AR(1)
-    if ar_phi is not None:
-        y_ar = np.zeros_like(y, dtype=float)
-        y_ar[0] = y[0]
-        for i in range(1, n):
-            eps_i = rng.normal(0, sigma)
-            y_ar[i] = intercept + trend * i + ar_phi * (y_ar[i-1] - intercept - trend * i) + eps_i
-        y = y_ar
+    if seasonal_type and season_period and season_amp != 0:
+        phase = np.sin(2 * np.pi * t / season_period)
+
+        if seasonal_type == "add":
+            seasonal = season_amp * phase
+            y = base + seasonal
+
+        elif seasonal_type == "mul":
+            seasonal = 1.0 + season_amp * phase
+            y = base * seasonal
+
+        else:
+            raise ValueError("seasonal_type must be 'add', 'mul' or None")
     else:
-        # шум
-        eps = rng.normal(0, sigma, size=n)
+        y = base.copy()
+    
+    # шум
+    eps = rng.normal(0, sigma, size=n)
+    if seasonal_type == "mul":
+        y = y * (1.0 + eps / np.maximum(1.0, np.abs(y)))
+    else:
         y = y + eps
 
     # outliers
     if outlier_frac and outlier_frac > 0.0:
         k = max(1, int(n * outlier_frac))
         idx = rng.choice(n, size=k, replace=False)
-        y[idx] += rng.normal(0, 5 * sigma, size=k)
+        if seasonal_type == "mul":
+            y[idx] *= rng.normal(1.0, 5.0, size=k)
+        else:
+            y[idx] += rng.normal(0, 5 * sigma, size=k)
+
+    min_y = y.min()
+    if min_y <= 0 and seasonal_type == "mul":
+        y = y + (1 - min_y)
+
 
     df = pd.DataFrame({"t": t, "y": y})
     return df
@@ -53,9 +68,9 @@ def generate_time_series(
 base_params = {
     "intercept": 10.0,
     "trend": 0.69,
-    "season_amp": 0,
+    "seasonal_type": "mul", # "add" | "mul" | None
+    "season_amp": 0.3,
     "season_period": 24,
-    "ar_phi": 0.7,
     "sigma": 1.0,
     "seed": 42,
 }
@@ -79,16 +94,16 @@ def create_and_save(n, outlier_frac):
         n=int(round(n * 1.3)),
         intercept=params["intercept"],
         trend=params["trend"],
+        seasonal_type=params["seasonal_type"],
         season_amp=params["season_amp"],
         season_period=params["season_period"],
-        ar_phi=params["ar_phi"],
         sigma=params["sigma"],
         outlier_frac=params["outlier_frac"],
         seed=params["seed"],
     )
 
     fname = (
-        "AR_"
+        "season_mul_"
         + "_".join(
             _sanitize(params[k])
             for k in ("n", "outlier_frac")
